@@ -1,12 +1,12 @@
 import { pool } from "../../config/DB";
 
 const getAllUsers = async () => {
-  const result = await pool.query(`SELEECT * FROM users`);
+  const result = await pool.query(`SELECT name, email, phone, role FROM users`);
   return result;
 };
 
 const getSingleUser = async (userId: string) => {
-  const result = await pool.query(`SELECT * FROM users WHERE id=$1`, [userId]);
+  const result = await pool.query(`SELECT name, email, phone, role FROM users WHERE id=$1`, [userId]);
   return result;
 };
 

@@ -4,12 +4,19 @@ import { userServices } from "./user.service";
 const getAllUsers = async (req: Request, res: Response) => {
   try {
     const result = await userServices.getAllUsers();
-
-    res.status(200).json({
-      success: true,
-      message: "Users retrieved successfully",
-      data: result,
-    });
+    if (result.rows.length == 0) {
+      res.status(200).json({
+        success: false,
+        message: "No user found",
+        data: [],
+      });
+    } else {
+      res.status(200).json({
+        success: true,
+        message: "User retrived successfully",
+        data: result.rows,
+      });
+    }
   } catch (err: any) {
     res.status(500).json({
       success: false,
@@ -49,7 +56,7 @@ const updateUser = async (req: Request, res: Response) => {
   try {
     const result = await userServices.updateUser(req.params.userId!, req.body);
     if (result.rows.length === 0) {
-      res.status(404).json({
+      res.status(200).json({
         success: false,
         message: "Could not update any user",
         data: [],
@@ -73,24 +80,22 @@ const updateUser = async (req: Request, res: Response) => {
 const deleteUser = async (req: Request, res: Response) => {
   try {
     const result = await userServices.deleteUser(req.params.userId as string);
+    console.log(result.rows[0]);
     if (result.rows.length === 0) {
       res.status(404).json({
         success: false,
-        message: "Could not delete the user",
-        data: [],
+        message: "NO user found to delete!",
       });
     } else {
       res.status(200).json({
         success: true,
         message: "User Deleted successfully",
-        data: result.rows[0],
       });
     }
   } catch (err: any) {
     res.status(500).json({
       success: false,
       message: err.message,
-      data: [],
     });
   }
 };
