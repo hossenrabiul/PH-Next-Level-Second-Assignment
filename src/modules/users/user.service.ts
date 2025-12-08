@@ -1,12 +1,17 @@
 import { pool } from "../../config/DB";
 
 const getAllUsers = async () => {
-  const result = await pool.query(`SELECT name, email, phone, role FROM users`);
+  const result = await pool.query(
+    `SELECT id, name, email, phone, role FROM users`
+  );
   return result;
 };
 
 const getSingleUser = async (userId: string) => {
-  const result = await pool.query(`SELECT name, email, phone, role FROM users WHERE id=$1`, [userId]);
+  const result = await pool.query(
+    `SELECT name, email, phone, role FROM users WHERE id=$1`,
+    [userId]
+  );
   return result;
 };
 
@@ -20,6 +25,21 @@ const updateUser = async (userId: string, Payload: Record<string, unknown>) => {
 };
 
 const deleteUser = async (userId: string) => {
+  const bookings = await pool.query(
+    `
+    
+    SELECT * FROM bookings WHERE customer_id=$1
+    `,
+    [userId]
+  );
+
+  if (bookings.rows.length) {
+     for(const booking of bookings.rows){
+      if(booking.status === "active"){
+        throw new Error("You have active bookings");
+      }
+    }
+  }
   const result = await pool.query(`DELETE FROM users WHERE id=$1 RETURNING *`, [
     userId,
   ]);

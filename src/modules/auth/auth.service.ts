@@ -21,25 +21,31 @@ const signIn = async (email: string, password: string) => {
   const result = await pool.query(`SELECT * FROM users WHERE email=$1`, [
     email,
   ]);
-  
+
   if (result.rows.length === 0) {
     throw new Error("Invalid Credentials");
   }
-  
+
   const user = result.rows[0];
   const matchPass = await bcrypt.compare(password as string, user.password);
-  console.log(matchPass)
+  console.log(matchPass);
   if (!matchPass) {
     throw new Error("Invalid Credentials");
   }
- 
-  const payload = { name: user.name, email: user.email, role: user.role };
+
+  const payload = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+  };
   const secret_key = config.jwt_sectet_key as string;
   const token = jwt.sign(payload, secret_key, { expiresIn: "7d" });
   console.log(token);
   delete user.password;
   return { token, user };
 };
+
 
 export const authServices = {
   signIn,

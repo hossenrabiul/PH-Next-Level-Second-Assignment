@@ -26,6 +26,9 @@ const createBooking = async (payload: Record<string, unknown>) => {
 
   const totalDays = endDate.getDate() - startDate.getDate();
   const totalPrice = vehicle.rows[0].daily_rent_price * totalDays;
+  if(totalPrice < 0){
+    throw new Error("TotalPrice must be positive")
+  }
   const result = await pool.query(
     `
         INSERT INTO bookings(customer_id, vehicle_id, rent_start_date, rent_end_date, total_price, status) VALUES($1, $2, $3, $4, $5, $6) RETURNING *
@@ -45,30 +48,110 @@ const createBooking = async (payload: Record<string, unknown>) => {
     daily_rent_price: vehicle.rows[0].daily_rent_price,
   };
 
-  const vehicleDetails = {
-    vehicle_name: vehicle.rows[0].vehicle_name,
-    type: vehicle.rows[0].type,
-    registration_number: vehicle.rows[0].registration_number,
-    daily_rent_price: vehicle.rows[0].daily_rent_price,
-    availability_status: "booked",
-  };
-  await vehiclesServices.updateVehicle(vehicle.rows[0].id, vehicleDetails);
+  await pool.query(`
+    UPDATE vehicles SET availability_status=$1 WHERE id=$2
+    `, ["booked", vehicle.rows[0].id])
 
   return result.rows[0];
-  // return {data : result.rows[0] , vehicle : {vehicle_name : vehicle.rows[0].vehicle_name, daily_rent_price : vehicle.rows[0].daily_rent_price}};
 };
 
-const getAllBookings = async ()=>{
-    const result = await pool.query(`SELECT * FROM bookings`)
+const getAllBookings = async (role: string, id: number) => {
+  if (role === "admin") {
+    const result = await pool.query(`SELECT * FROM bookings`);
+    if (result.rows.length) {
+      // Customer
+      for (const booking of result.rows) {
+        const customer = await pool.query(
+          `SELECT name, email FROM users WHERE id = $1`,
+          [booking.customer_id]
+        );
+        booking.customer = {
+          name: customer.rows[0].name,
+          email: customer.rows[0].email,
+        };
+      }
+      // Vehicle
+      for (const booking of result.rows) {
+        const vehicle = await pool.query(
+          `SELECT vehicle_name, registration_number FROM vehicles WHERE id = $1`,
+          [booking.vehicle_id]
+        );
+        booking.vehicle = {
+          vehicle_name: vehicle.rows[0].vehicle_name,
+          registration_number: vehicle.rows[0].registration_number,
+        };
+      }
+    }
+
     return result;
-}
+  } else {
+    const result = await pool.query(
+      `SELECT * FROM bookings WHERE customer_id=$1`,
+      [id]
+    );
+
+    if (result.rows.length) {
+      // Vehicle
+      for (const booking of result.rows) {
+        const vehicle = await pool.query(
+          `SELECT vehicle_name, registration_number, type FROM vehicles WHERE id = $1`,
+          [booking.vehicle_id]
+        );
+        booking.vehicle = {
+          vehicle_name: vehicle.rows[0].vehicle_name,
+          registration_number: vehicle.rows[0].registration_number,
+          type: vehicle.rows[0].type,
+        };
+      }
+    }
+    return result;
+  }
+};
+
+const updateBooking = async (role: string, bookingId: string) => {
+  if (role === "admin") {
+    const result = await pool.query(
+      `
+    UPDATE bookings SET status=$1 WHERE id=$2 RETURNING *
+    `,
+      ["returned", bookingId]
+    );
+
+    if (result.rows.length) {
+      const vehicle = await pool.query(
+        `
+      UPDATE vehicles SET availability_status=$1 WHERE id=$2 RETURNING availability_status
+      `,
+        ["available", result.rows[0].vehicle_id]
+      );
+      result.rows[0].vehicle = {
+        availability_status: vehicle.rows[0].availability_status,
+      };
+    }
+    return result;
+  } else {
+    const result = await pool.query(
+      `
+    UPDATE bookings SET status=$1 WHERE id=$2 RETURNING *
+    `,
+      ["cancelled", bookingId]
+    );
+
+    if (result.rows.length) {
+      const vehicle = await pool.query(
+        `
+      UPDATE vehicles SET availability_status=$1 WHERE id=$2 RETURNING availability_status
+      `,
+        ["available", result.rows[0].vehicle_id]
+      );
+    }
+
+    return result;
+  }
+};
 
 export const bookingServices = {
   createBooking,
   getAllBookings,
+  updateBooking,
 };
-
-// "customer_id": 1,
-//   "vehicle_id": 2,
-//   "rent_start_date": "2024-01-15",
-//   "rent_end_date": "2024-01-20"
