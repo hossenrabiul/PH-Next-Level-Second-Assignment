@@ -30,6 +30,7 @@ const auth = (...roles: ("admin" | "user")[]) => {
 
     
       req.user = decoded
+      
       if (user.rows.length === 0) {
         throw new Error("No user found");
       }
